@@ -1,0 +1,8 @@
+aiohttp
+cachetools
+dnslib
+isc-dhcp-leases
+python-hosts
+nuitka
+ifaddr
+inotify
