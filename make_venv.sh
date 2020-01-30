@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ENV=mock_dns_env
+ENV=dnsmock_env
 
 [ -d $ENV ] || python3 -m venv $ENV
 
