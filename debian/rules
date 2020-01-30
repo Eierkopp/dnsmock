@@ -1,0 +1,16 @@
+#!/usr/bin/make -f
+export DH_VERBOSE = 1
+
+export PYBUILD_NAME=dnsmock
+
+%:
+	dh $@
+
+dnsmock:
+	dnsmock_env/bin/python3 -m nuitka -j 4 -o dnsmock --show-scons --recurse-all dnsmock.py
+
+override_dh_install: dnsmock
+	dh_install dnsmock /usr/bin
+	dh_install config/dnsmock.conf.sample /etc/dnsmock
+	dh_install config/logger.conf /etc/dnsmock
+	dh_install config/dnsmock.service /lib/systemd/system

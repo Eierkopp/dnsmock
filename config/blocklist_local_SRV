@@ -1,0 +1,7 @@
+SRV
+# don't proxy hostnames without domain
++
+# answer SRV queries for local SIP server
+_sip.*.my.domain.name             { "SRV" : [[20, 10, 5060, "my.domain.name"]] }
+# don't proxy localdomain
+*.localdomain

@@ -1,0 +1,9 @@
+MX
+# don't proxy hostnames without domain
++                       { "MX" : [["my.domain.name", 20]] }
+# don't proxy my domain
+*.my.domain.name             { "MX" : [["my.domain.name", 20]] }
+# don't proxy localdomain
+*.localdomain           { "MX" : [["my.domain.name", 20]] }
+
+

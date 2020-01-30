@@ -1,0 +1,7 @@
+PTR ANY
+# don't proxy my address range
++.178.168.192.in-addr.arpa
+*.127.in-addr.arpa
+# don't proxy ipv6
+*.ip6.arpa
+

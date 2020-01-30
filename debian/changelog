@@ -1,0 +1,9 @@
+dnsmock (1.0) unstable; urgency=medium
+
+  * Initial Release.
+
+ -- depperter depp <depperter.depp@googlemail.com>  Mon, 27 Jan 2020 15:25:22 +0100
+
+
+
+# check format with  $ dpkg-parsechangelog -l debian/changelog --all

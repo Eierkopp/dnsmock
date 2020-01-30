@@ -62,13 +62,13 @@ config = ConfigParser(interpolation=ExtendedInterpolation())
 config.getlist = types.MethodType(get_list, config)
 config.read(conf_file)
 
-parser = argparse.ArgumentParser(prog='mock_dns',
+parser = argparse.ArgumentParser(prog='dnsmock',
                                  formatter_class=WideHelpFormatter)
 
 parser.add_argument("--config",
                     help="configuration file location",
                     dest="config",
-                    default="/etc/mock_dns/mock_dns.conf")
+                    default="/etc/dnsmock/dnsmock.conf")
 
 parser.add_argument("--exthelp",
                     help="extended help",

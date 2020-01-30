@@ -1,7 +1,7 @@
 #!/bin/bash
 
-ENV_DIR=mock_dns_env
-PYTHON=`which python3.7`
+ENV_DIR=dnsmock_env
+PYTHON=`which python3`
 
 [ -d $ENV_DIR ] && rm -rf $ENV_DIR
 
@@ -9,7 +9,7 @@ virtualenv -p $PYTHON $ENV_DIR
 
 $ENV_DIR/bin/pip install -U -r requirements.txt
 
-rm mock_dns.exe
+[ -f dnsmock ] && rm dnsmock
 
 dpkg-buildpackage -b --no-sign
 

@@ -1,0 +1,8 @@
+A AAAA ANY SOA ANY CNAME
+# don't proxy hostnames
++
+# don't proxy my domain
+*.my.domain.name             
+# don't proxy localdomain
+*.localdomain
+
