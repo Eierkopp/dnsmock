@@ -36,13 +36,13 @@ def get_list(conf, section, option, **kwargs):
     return [x.strip() for x in shlex.split(value)]
 
 
-parser = argparse.ArgumentParser(prog='mock_dns',
+parser = argparse.ArgumentParser(prog='dnsmock',
                                  formatter_class=WideHelpFormatter)
 
 parser.add_argument("--config",
                     help="configuration file location",
                     dest="config",
-                    default="/etc/mock_dns/mock_dns.conf")
+                    default="/etc/dnsmock/dnsmock.conf")
 
 parser.add_argument("--exthelp",
                     help="extended help",

@@ -16,10 +16,10 @@ log_config_help = File containing logger configuration in JSON format for python
 log_config = /etc/dnsmock/logger.conf
 
 interfaces_help = List of local interfaces to bind to
-interfaces = lo br0 br1 ppp0
+interfaces = lo eth0
 
 port_help = Local port to listen on
-port = 5353
+port = 53
 
 conn_timeout_help = Max connection idle time
 conn_timeout = 3
