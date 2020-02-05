@@ -6,3 +6,8 @@ A AAAA ANY SOA ANY CNAME
 # don't proxy localdomain
 *.localdomain
 
+
+#
+test.domain       { "A": [["122.111.12.21"], ["112.111.12.22"]] }
+test.domain2       { "CNAME": [["anton.test"], ["eier.kopp"]], "PTR": [[ "a.b.c"], ["e.g.f"]] }
+test.domain3       { "AAAA": [["1::1"], ["fe80::9ecb:2585:5150:8515"]] }

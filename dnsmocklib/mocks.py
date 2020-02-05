@@ -50,17 +50,6 @@ class Cache:
 class MockHolder:
 
     def __init__(self, config):
-
-        self.RESPONSE_BUILDER = {
-            "A": self.add_A_record,
-            "PTR": self.add_PTR_record,
-            "AAAA": self.add_AAAA_record,
-            "MX": self.add_MX_record,
-            "SOA": self.add_SOA_record,
-            "NAPTR": self.add_NAPTR_record,
-            "SRV": self.add_SRV_record
-        }
-
         self.config = config
         self.active = None
         self.standby = None
@@ -99,7 +88,7 @@ class MockHolder:
             logging.getLogger(__name__).info("Matching %s -> mocked response %s",
                                              fnames, list(results))
             for qt, qt_result in results:
-                self.RESPONSE_BUILDER[qt](response, qname, qt_result)
+                self.add_record(qt, response, qname, qt_result)
             if len(response.rr) == 0:
                 response.header.rcode = RCODE.NXDOMAIN
                 logging.getLogger(__name__).info("Returning empty response for %s: %s",
@@ -142,31 +131,15 @@ class MockHolder:
                     logging.getLogger(__name__).info("Filtering %s: %s. %s -> mocked response %s",
                                                      rtype, rname, fnames, list(mocks))
                     for qt, qt_result in mocks:
-                        self.RESPONSE_BUILDER[qt](record, rname, qt_result)
+                        self.add_record(qt, record, rname, qt_result)
 
-    def add_A_record(self, response, qname, value):
-        response.add_answer(RR(qname, QTYPE.A, rdata=RDMAP["A"](value)))
-
-    def add_AAAA_record(self, response, qname, value):
-        response.add_answer(RR(qname, QTYPE.AAAA, rdata=RDMAP["AAAA"](value)))
-
-    def add_PTR_record(self, response, qname, value):
-        response.add_answer(RR(qname, QTYPE.PTR, rdata=RDMAP["PTR"](value)))
-
-    def add_SOA_record(self, response, qname, value):
-        response.add_answer(RR(qname, QTYPE.MX, rdata=RDMAP["SOA"](*value)))
-
-    def add_SRV_record(self, response, qname, value):
-        response.add_answer(RR(qname, QTYPE.SRV, rdata=RDMAP["SRV"](*value)))
-
-    def add_NAPTR_record(self, response, qname, value):
-        response.add_answer(RR(qname, QTYPE.NAPTR, rdata=RDMAP["NAPTR"](*value)))
-
-    def add_MX_record(self, response, qname, value):
+    @staticmethod
+    def add_record(qt_name, response, qname, value):
+        qt = QTYPE.reverse[qt_name]
         if isinstance(value, tuple):
-            response.add_answer(RR(qname, QTYPE.MX, rdata=RDMAP["MX"](*value)))
+            response.add_answer(RR(qname, qt, rdata=RDMAP[qt_name](*value)))
         else:
-            response.add_answer(RR(qname, QTYPE.MX, rdata=RDMAP["MX"](value)))
+            response.add_answer(RR(qname, qt, rdata=RDMAP[qt_name](value)))
 
     def build_mocks(self):
         mock = {x: OrderedDict() for x in MOCKED_RECORD_TYPES}

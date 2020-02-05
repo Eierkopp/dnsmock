@@ -2,4 +2,4 @@
 
 . dnsmock_env/bin/activate
 
-python ./dnsmock --config config/devel.conf "$@"
+python ./dnsmock.py --config config/devel.conf "$@"
