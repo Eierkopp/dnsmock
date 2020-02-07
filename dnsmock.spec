@@ -2,13 +2,14 @@
 
 Summary: Mocking DNS proxy
 Name: dnsmock
-Version: 1.1
+Version: 1.0
 Release: 1
 License: GPL2
 URL: https://github.com/Eierkopp/dnsmock.git
 Group: Applications/Internet
 Packager: Eierkopp
-Requires: bash, python3.7
+Requires: bash, python3
+BuildRequires: python3-devel, gcc-c++
 Source: dnsmock.tar.bz2
 AutoReqProv: no
 
@@ -27,20 +28,29 @@ echo Setup
 
 pwd
 
+./make_venv.sh
+
 [ -d $RPM_BUILD_ROOT ] && rm -rf $RPM_BUILD_ROOT
-mkdir -p $RPM_BUILD_ROOT
-cp -a etc lib usr $RPM_BUILD_ROOT
+mkdir -p $RPM_BUILD_ROOT/etc/dnsmock
+cp -a config/dnsmock.conf.sample $RPM_BUILD_ROOT/etc/dnsmock
+cp -a config/dnsmock.conf.sample config/logger.conf $RPM_BUILD_ROOT/etc/dnsmock
+mkdir -p $RPM_BUILD_ROOT/usr/bin
+[ -f dnsmock ] || dnsmock_env/bin/python3 -m nuitka -j 4 -o dnsmock --show-scons --recurse-all dnsmock.py
+cp -a dnsmock $RPM_BUILD_ROOT/usr/bin
+mkdir -p $RPM_BUILD_ROOT/usr/share/doc/dnsmock
+cp -a LICENSE $RPM_BUILD_ROOT/usr/share/doc/dnsmock
+mkdir -p $RPM_BUILD_ROOT/lib/systemd/system
+cp -a config/dnsmock.service $RPM_BUILD_ROOT/lib/systemd/system
 
 %post
 
-addgroup --system --quiet dnsmock
-adduser --system --disabled-login --quiet --group dnsmock
+adduser --system -M -U dnsmock
 mkdir -p /var/log/dnsmock
 chown dnsmock:dnsmock /var/log/dnsmock
 
 %postun
 
-deluser --quiet dnsmock
+grep dnsmock: /etc/passwd && userdel dnsmock
 
 %files
 
@@ -49,4 +59,4 @@ deluser --quiet dnsmock
 %config /etc/dnsmock
 %attr(755, root, root) /usr/bin/dnsmock
 %attr(644, root, root) /lib/systemd/system/dnsmock.service
-%attr(644, root, root) /usr/share
+%attr(644, root, root) /usr/share/doc/dnsmock

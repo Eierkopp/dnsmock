@@ -255,7 +255,7 @@ class MockHolder:
         """convert blocklist pattern to Python regex
         + matches a section, e.g. x.+.y matches x.eier.y but not x.eier.y.z
         * matches everything, e.g. *x.y matches a.x.y or ax.y
-        *. matches everything even without the dot, e.g. *.x.y matches x.y or a.b.x.y
+        *. matches everything even without the dot, e.g. *.x.y matches x.y or a.b.x.y but not ax.y
         """
 
         e = key.replace(".", r"\.")

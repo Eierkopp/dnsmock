@@ -7,6 +7,3 @@ ENV=dnsmock_env
 . ${ENV}/bin/activate
 
 pip install -U -r requirements.txt
-
-
-
