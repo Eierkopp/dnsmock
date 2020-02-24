@@ -112,7 +112,6 @@ async def open_server(loop, config, protocol_handler, interfaces, port):
     for i in ifaddr.get_adapters():
         if i.name in interfaces:
             for ip in i.ips:
-                print(ip)
                 if isinstance(ip.ip, tuple):  # ipv6addr, flowinfo, scope
                     ip_addresses.add((f"{ip.ip[0]}%{ip.ip[2]}", socket.AF_INET6))
                 else:
