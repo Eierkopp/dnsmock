@@ -14,7 +14,7 @@ from dnsmocklib.file_guard import Guard
 
 logging.basicConfig(level=logging.DEBUG)
 
-MOCKED_RECORD_TYPES = ["A", "PTR", "AAAA", "MX", "SOA", "CNAME", "SRV", "NAPTR", "ANY"]
+MOCKED_RECORD_TYPES = ["A", "PTR", "AAAA", "MX", "SOA", "CNAME", "SRV", "NAPTR", "TXT", "ANY"]
 
 
 def qt_qn(record):
