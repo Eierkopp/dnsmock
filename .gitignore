@@ -6,4 +6,6 @@ dnsmock.build
 dnsmock_env
 dnsmock
 
+__pycache__
+
 *~
