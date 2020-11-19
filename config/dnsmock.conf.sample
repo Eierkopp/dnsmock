@@ -10,6 +10,11 @@ timeout = 2.0
 addresses_help = List of peer DNS addresses
 addresses = 9.9.9.9 208.67.222.222 208.67.220.220
 
+doh_addresses_help = List of DOH URL templates
+#doh_addresses = https://9.9.9.9/dns-query https://146.112.41.2/dns-query
+doh_addresses = 
+
+
 [local]
 
 log_config_help = File containing logger configuration in JSON format for python dictconfig
