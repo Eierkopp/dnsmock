@@ -15,8 +15,11 @@ loop.set_debug(config.getboolean("global", "debug"))
 mocks = dnsmocklib.mocks(config, loop)
 mocks.start()
 
+client = dnsmocklib.DNS_Client(config)
+loop.run_until_complete(client.start())
+
 network = dnsmocklib.network(config, loop)
-network.start(mocks)
+network.start(mocks, client)
 
 http_server = dnsmocklib.http_server(config, loop)
 http_server.start(network, mocks)
@@ -30,5 +33,6 @@ except KeyboardInterrupt:
 
 http_server.shutdown()
 network.stop()
+loop.run_until_complete(client.stop())
 mocks.stop()
 loop.close()

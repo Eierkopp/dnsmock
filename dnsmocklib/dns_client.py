@@ -2,143 +2,234 @@
 # -*- coding: utf-8 -*-
 
 import aiohttp
+from aiosocketpool import AsyncConnectionPool, AsyncTcpConnector
 import asyncio
 import base64
 from dnslib import DNSRecord, QTYPE
-from functools import partial
+import functools
 import ipaddress
 import logging
+import socket
 import struct
-from dnsmocklib.tcp_connection import TCPConnection
+import time
+
+import dnsmocklib
 
 logging.basicConfig(level=logging.DEBUG)
+log = logging.getLogger
 
 
-class DOH_Client(object):
+def log_exception(function):
 
-    def __init__(self, context, address):
-        self.context = context
-        self.address = address
-        self.context.loop.run_until_complete(self.async_init())
+    module = function.__module__
+    myname = module + "." + function.__name__
+    exclog = log(module)
 
-    async def async_init(self):
+    if asyncio.iscoroutinefunction(function):
+
+        @functools.wraps(function)
+        async def wrapper(*args, **kwargs):
+            try:
+                return await function(*args, **kwargs)
+            except Exception:
+                exclog.error("Exception in " + myname, exc_info=True)
+
+        return wrapper
+
+    else:
+
+        @functools.wraps(function)
+        def wrapper(*args, **kwargs):
+            try:
+                return function(*args, **kwargs)
+            except Exception:
+
+                exclog.error("Exception in " + myname, exc_info=True)
+
+        return wrapper
+
+
+class DNS_Client:
+
+    def __init__(self, interface, server):
+        self.interface = interface
+        self.server = server
+
+    async def start(self):
+        raise NotImplementedError()
+
+    async def stop(self):
+        raise NotImplementedError()
+
+    async def query(self, record):
+        raise NotImplementedError()
+
+
+class DOH_Client(DNS_Client):
+
+    def __init__(self, interface, server):
+        super().__init__(interface, server)
+
+    async def start(self):
+        log(__name__).info("Starting DOH client for address %s", self.server)
         self.session = aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=self.interface.timeout),
             headers={"Content-type": "application/dns-message"})
 
-    def close(self):
-        logging.getLogger(__name__).info("Closing DOH_Client for %s", self.address)
-        self.context.loop.run_until_complete(self.session.close())
+    async def stop(self):
+        log(__name__).info("Closing DOH client for %s", self.server)
+        await self.session.close()
 
-    async def query(self, dns_packet):
-        async with self.session.get(self.address,
+    @log_exception
+    async def query(self, dns_packet, req_id):
+        async with self.session.get(self.server,
                                     params={"dns": dns_packet}) as response:
             if response.status > 299:
                 return None
             if response.headers['content-type'] != "application/dns-message":
                 return None
 
-            resp = self.context.dns_parse(await response.read())
+            resp = self.interface.dns_parse(await response.read())
             return resp
 
 
-class UDP_Client(asyncio.Protocol):
+class UDP_Client(DNS_Client, asyncio.DatagramProtocol):
 
-    def __init__(self, context, request, result):
-        self.contex = context
-        self.loop = context.loop
-        self.config = context.config
-        self.request = request
-        self.result = result
-        self.transport = None
-        self.timeout = self.loop.call_later(self.config.getfloat("peer", "timeout"),
-                                            self.close)
+    def __init__(self, interface, server):
+        super().__init__(interface, server)
+        self.requests = dict()
 
-    def connection_made(self, transport):
-        self.transport = transport
-        self.transport.sendto(self.request)
+    async def start(self):
+        log(__name__).info("Starting UDP client for address %s", self.server)
+        loop = asyncio.get_event_loop()
+        self.transport, _ = await loop.create_datagram_endpoint(
+            self,
+            family=socket.AF_INET,
+            remote_addr=(self.server, 53)
+        )
 
-    def close(self):
-        self.timeout.cancel()
-        if not (self.result.done() or self.result.cancelled()):
-            self.result.set_result(None)
-        if self.transport:
-            self.transport.close()
+    async def stop(self):
+        log(__name__).info("Closing UDP client for address %s", self.server)
+        self.transport.close()
 
-    def datagram_received(self, data, addr):
-        if not self.result.cancelled():
-            self.result.set_result(context.dns_parse(data))
-        self.close()
+    def __call__(self):
+        return self  # Protocol factory will always return this instance
 
-    def error_received(self, exc):
-        self.close()
+    def datagram_received(self, data, address):
+        resp = self.interface.dns_parse(data)
+        req_id = resp.header.id
+        future = self.requests.pop(req_id, None)
+        if future is not None:
+            future.set_result(resp)
+
+    def deregister(self, req_id):
+        self.requests.pop(req_id, None)
+
+    @log_exception
+    async def query(self, record, req_id):
+        future = asyncio.futures.Future()
+        self.requests[req_id] = future
+        self.transport.sendto(record)
+        await future
+        return future.result()
 
 
-class TCPResponseHandler:
+class TCP_Client(DNS_Client):
 
-    def __init__(self):
-        self.buffer = bytearray()
-        self.pending = dict()
+    def __init__(self, interface, server):
+        super().__init__(interface, server)
+        self.pool = AsyncConnectionPool(
+            factory=AsyncTcpConnector,
+            reap_connections=True,
+            max_lifetime=10,
+            max_size=2
+        )
 
-    def register(self, record_id, response):
-        self.pending[record_id] = response
+    async def start(self):
+        log(__name__).info("Starting TCP client for address %s", self.server)
 
-    def deregister(self, record_id):
-        self.pending.pop(record_id, None)
-
-    def flush(self):
-        self.buffer.clear()
-        for record_id, response in self.pending.items():
-            response.cancel()
-        self.pending.clear()
-
-    def add(self, data):
-        self.buffer += data
-        if self.is_complete(self.buffer):
-            self.buffer = self.handle(self.buffer)
+    async def stop(self):
+        log(__name__).info("Closing TCP client for address %s", self.server)
+        self.pool.reap_all()
+        self.pool.stop_reaper()
 
     def is_complete(self, buffer):
         if len(buffer) < 2:
             return False
-        return struct.unpack(">h", self.buffer[:2])[0] + 2 <= len(self.buffer)
+        return struct.unpack(">h", buffer[:2])[0] + 2 <= len(buffer)
 
-    def handle(self, buffer):
-        length = struct.unpack(">h", self.buffer[:2])[0]
-        record = buffer[2:length+2]
-        parsed_record = context.dns_parse(record)
-        record_id = parsed_record.header.id
-        response = self.pending.get(record_id, None)
-        if response and not (response.done() or response.cancelled()):
-            response.set_result(parsed_record)
-        return buffer[length+2:]
+    @log_exception
+    async def query(self, record, req_id):
+        buffer = b""
+        async with self.pool.connection(host=self.server, port=53) as conn:
+            await conn.sendall(struct.pack(">h", len(record)))
+            await conn.sendall(record)
+            while not self.is_complete(buffer):
+                buffer += await conn.recv(128)
+        return self.interface.dns_parse(buffer[2:])
 
 
-class Context:
+class DNS_Client(object):
 
-    def __init__(self, config, loop):
-        self.loop = loop
+    def __init__(self, config):
+        self.config = config
+        self.doh_interface = DOH_Interface(config)
+        self.tcp_interface = TCP_Interface(config)
+        self.udp_interface = UDP_Interface(config)
+
+    async def start(self):
+        log(__name__).debug("Starting DNS client")
+        await self.doh_interface.start()
+        await self.tcp_interface.start()
+        await self.udp_interface.start()
+
+    async def stop(self):
+        log(__name__).debug("Closing DNS client")
+        await self.udp_interface.stop()
+        await self.tcp_interface.stop()
+        await self.doh_interface.stop()
+
+    async def query(self, record: DNSRecord):
+        response = await self.doh_interface.query(record)
+        if self.response_ok(response):
+            return response
+        response = await self.udp_interface.query(record)
+        if self.response_ok(response) and not response.header.tc:
+            return response
+        response = await self.tcp_interface.query(record)
+        if self.response_ok(response):
+            return response
+
+    @staticmethod
+    def response_ok(response):
+        return response is not None and response.header.rcode in [0]
+
+
+class Client_Interface:
+
+    def __init__(self, config):
         self.config = config
         self.timeout = config.getfloat("peer", "timeout")
-
-        self.addresses = config.getlist("peer", "addresses")
-        self.doh_addresses = config.getlist("peer", "doh_addresses")
+        self.next_id = 100
         self.build_ip_filter()
 
-        self.next_id = 0
+    def get_next_id(self):
+        self.next_id = (self.next_id + 1) & 0xffff
+        return self.next_id
 
-        if "context" in globals():
-            raise Exception("Context already created")
-        global context
-        context = self
+    def mock_id(self, record):
+        orig_id = record.header.id
+        record_id = self.get_next_id()
+        record.header.id = record_id
+        request = record.pack()
+        record.header.id = orig_id
+        return request, record_id
 
     def build_ip_filter(self):
         self.ip_filter_networks = []
         if self.config.has_option("ip_filter", "ranges"):
             for net in self.config.getlist("ip_filter", "ranges"):
                 self.ip_filter_networks.append(ipaddress.ip_network(net))
-
-    def get_next_id(self):
-        self.next_id = (self.next_id + 1) & 0xffff
-        return self.next_id
 
     def dns_parse(self, record):
         """Parse a dns response and for A/AAAA
@@ -154,146 +245,127 @@ class Context:
                 a = ipaddress.ip_address(r.rdata)
                 for n in self.ip_filter_networks:
                     if a in n:
-                        logging.getLogger(__name__).warn("DNS rebind protection, removing %s" % a)
+                        log(__name__).warn("DNS rebind protection, removing %s" % a)
                         del result.rr[i]
                         break
         return result
 
-    def has_result(self, result):
-        return result.header.rcode == 0
+    async def start(self):
+        raise NotImplementedError()
 
-    async def udp_query(self, address, request, record_id):
-        result_fut = asyncio.Future(loop=self.loop)
-        try:
-            await self.loop.create_datagram_endpoint(
-                partial(UDP_Client, self, request, result_fut),
-                remote_addr=(address, 53))
-            await asyncio.wait_for(result_fut,
-                                   timeout=self.timeout)
-            return result_fut.result()
-        except asyncio.CancelledError:
-            return None
-        except Exception as e:
-            logging.getLogger(__name__).info("UDP query %d to %s error: %s", record_id, address, e)
+    async def stop(self):
+        raise NotImplementedError()
+
+    async def query(self, record):
+        raise NotImplementedError()
+
+
+class Group_Interface(Client_Interface):
+
+    def __init__(self, config, name, client_factory, addresses):
+        super().__init__(config)
+        self.name = name
+        self.client_factory = client_factory
+        self.addresses = addresses
+
+    async def start(self):
+        log(__name__).info("Starting %s interface", self.name)
+        self.clients = [self.client_factory(self, address) for address in self.addresses]
+        for client in self.clients:
+            await client.start()
+
+    async def stop(self):
+        log(__name__).info("Closing %s interface", self.name)
+        for client in self.clients:
+            await client.stop()
+
+    async def query(self, record: DNSRecord):
+        if not self.clients:
             return None
 
-    async def try_udp(self, request, record_id):
-        jobs = [self.udp_query(address, request, record_id)
-                for address in self.addresses]
-        while jobs:
-            done, jobs = await asyncio.wait(jobs,
-                                            return_when=asyncio.FIRST_COMPLETED)
-            for job in jobs:
-                job.cancel()
-            for job in done:
-                record = job.result()
-                if isinstance(record, DNSRecord) and record.header.tc:
-                    return "truncated"
-                else:
-                    return record
+        log(__name__).info("%s query", self.name)
 
-    async def tcp_query(self, server, request, record_id):
-        result_fut = asyncio.Future(loop=self.loop)
-        server.handler().register(record_id, result_fut)
-        try:
-            await server.send(struct.pack(">h", len(request)) + request)
-            await asyncio.wait_for(result_fut, timeout=self.timeout)
-            return result_fut.result()
-        except asyncio.CancelledError:
-            return None
-        except Exception as e:
-            logging.getLogger(__name__).info("TCP query %d to %s error: %s",
-                                             record_id, server.remote_addr(), e,
-                                             exc_info=True)
-            return None
-        finally:
-            server.handler().deregister(record_id)
+        dns_req, req_id = self.prepare(record)
 
-    async def try_tcp(self, request, record_id):
-        jobs = [self.tcp_query(server, request, record_id)
-                for server in self.tcp_server]
+        jobs = [asyncio.create_task(client.query(dns_req, req_id)) for client in self.clients]
         retval = None
-        while jobs:
+        start = time.time()
+        finished = len(jobs) == 0
+        while not finished:
             done, jobs = await asyncio.wait(jobs,
+                                            timeout=self.timeout,
                                             return_when=asyncio.FIRST_COMPLETED)
+            finished = start + self.timeout < time.time() or len(jobs) == 0
             for job in done:
-                if job.result() is not None:
-                    retval = job.result
+                retval = job.result()
+                if DNS_Client.response_ok(retval):
+                    retval.header.id = record.header.id
+                    finished = True
                     break
 
         for job in jobs:
             job.cancel()
+        self.cleanup(req_id)
+
         return retval
 
-    async def try_doh(self, record):
+
+class UDP_Interface(Group_Interface):
+
+    def __init__(self, config):
+        super().__init__(config, "UDP", UDP_Client, config.getlist("peer", "addresses"))
+
+    def prepare(self, record):
+        return self.mock_id(record)
+
+    def cleanup(self, req_id):
+        for client in self.clients:
+            client.deregister(req_id)
+
+
+class TCP_Interface(Group_Interface):
+
+    def __init__(self, config):
+        super().__init__(config, "TCP", TCP_Client, config.getlist("peer", "addresses"))
+
+    def prepare(self, record):
+        return self.mock_id(record)
+
+    def cleanup(self, req_id):
+        pass
+
+
+class DOH_Interface(Group_Interface):
+
+    def __init__(self, config):
+        super().__init__(config, "DOH", DOH_Client, config.getlist("peer", "doh_addresses"))
+
+    def prepare(self, record):
         orig_id = record.header.id
         record.header.id = 0
         request = record.pack()
-        dns_req = base64.urlsafe_b64encode(request).decode("ascii").rstrip("=")
-        jobs = [doh.query(dns_req) for doh in self.doh_server]
-        retval = None
-        try:
-            while jobs:
-                done, jobs = await asyncio.wait(jobs,
-                                                timeout=self.timeout,
-                                                return_when=asyncio.FIRST_COMPLETED)
-                for job in done:
-                    if job.result() is not None:
-                        retval = job.result()
-                        break
-
-            for job in jobs:
-                job.cancel()
-            return retval
-        finally:
-            record.header.id = orig_id
-
-    def mock_id(self, record):
-        orig_id = record.header.id
-        record_id = self.get_next_id()
-        record.header.id = record_id
-        request = record.pack()
         record.header.id = orig_id
-        return request, record_id
+        dns_req = base64.urlsafe_b64encode(request).decode("ascii").rstrip("=")
+        return dns_req, 0
 
-    async def query(self, record):
+    def cleanup(self, req_id):
+        pass
 
-        logging.getLogger(__name__).info("Send query for %s", record.q.qname)
 
-        result = await self.try_doh(record)
+if __name__ == "__main__":
 
-        if result is None:
-            request, record_id = self.mock_id(record)
+    async def run(config):
+        dns_client = DNS_Client(config)
+        await dns_client.start()
 
-            result = await self.try_udp(request, record_id)
-            if result == "truncated":
-                result = await self.try_tcp(request, record_id)
+        record = DNSRecord.question("google.com")
+        record.header.id = 77
+        response = await dns_client.query(record)
+        print(response)
 
-        if isinstance(result, DNSRecord):
-            result.header.id = record.header.id
-            return result
-        else:
-            return None
+        await dns_client.stop()
 
-        return result
+    config = dnsmocklib.config
 
-    def start(self):
-        self.tcp_server = []
-        for ip in self.addresses:
-            response_handler = TCPResponseHandler()
-            server = TCPConnection(self.loop,
-                                   ip,
-                                   53,
-                                   self.config.getfloat("peer", "timeout"),
-                                   response_handler)
-            self.tcp_server.append(server)
-
-        self.doh_server = []
-        for address in self.doh_addresses:
-            server = DOH_Client(self, address)
-            asyncio
-            self.doh_server.append(server)
-
-    def stop(self):
-        for doh_srv in self.doh_server:
-            doh_srv.close()
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(run(config))

@@ -196,7 +196,7 @@ class Context:
         self.config = parent_config
 
     def query(self, record):
-        return self.client_context.query(record)
+        return self.client.query(record)
 
     async def close_all(self):
         for s in self.server:
@@ -214,14 +214,12 @@ class Context:
                                         self.config.getint("local", "port"))
         logging.getLogger(__name__).info("Server running: %s", pformat(self.server))
 
-    def start(self, mocks):
+    def start(self, mocks, client):
         self.mocks = mocks.mocks
         self.cache = mocks.cache
-        self.client_context = dns_client.Context(self.config, self.loop)
-        self.client_context.start()
+        self.client = client
 
         self.loop.run_until_complete(self.rebind())
 
     def stop(self):
-        self.client_context.stop()
         self.loop.run_until_complete(self.close_all())
