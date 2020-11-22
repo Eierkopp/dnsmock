@@ -13,8 +13,6 @@ import socket
 import struct
 import time
 
-import dnsmocklib
-
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger
 
@@ -165,8 +163,11 @@ class TCP_Client(DNS_Client):
             await conn.sendall(struct.pack(">h", len(record)))
             await conn.sendall(record)
             while not self.is_complete(buffer):
-                data = await conn.recv(128)
-                if not data:
+                try:
+                    data = await asyncio.wait_for(conn.recv(128), timeout=self.interface.timeout)
+                    if not data:
+                        return None
+                except TimeoutError:
                     return None
                 buffer += data
 
@@ -300,8 +301,9 @@ class Group_Interface(Client_Interface):
             finished = start + self.timeout < time.time() or len(jobs) == 0
             for job in done:
                 retval = job.result()
-                if DNS_Client.response_ok(retval):
+                if isinstance(retval, DNSRecord):
                     retval.header.id = record.header.id
+                if DNS_Client.response_ok(retval):
                     finished = True
                     break
 
