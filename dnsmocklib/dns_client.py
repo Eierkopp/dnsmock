@@ -5,7 +5,7 @@ import aiohttp
 from aiosocketpool import AsyncConnectionPool, AsyncTcpConnector
 import asyncio
 import base64
-from dnslib import DNSRecord, QTYPE
+from dnslib import DNSRecord, QTYPE, RCODE
 import functools
 import ipaddress
 import logging
@@ -165,7 +165,11 @@ class TCP_Client(DNS_Client):
             await conn.sendall(struct.pack(">h", len(record)))
             await conn.sendall(record)
             while not self.is_complete(buffer):
-                buffer += await conn.recv(128)
+                data = await conn.recv(128)
+                if not data:
+                    return None
+                buffer += data
+
         return self.interface.dns_parse(buffer[2:])
 
 
@@ -194,15 +198,13 @@ class DNS_Client(object):
         if self.response_ok(response):
             return response
         response = await self.udp_interface.query(record)
-        if self.response_ok(response) and not response.header.tc:
-            return response
-        response = await self.tcp_interface.query(record)
-        if self.response_ok(response):
-            return response
+        if isinstance(response, DNSRecord) and response.header.tc:  # truncated
+            response = await self.tcp_interface.query(record)
+        return response
 
     @staticmethod
     def response_ok(response):
-        return response is not None and response.header.rcode in [0]
+        return response is not None and response.header.rcode in [RCODE.NOERROR, RCODE.NXDOMAIN]
 
 
 class Client_Interface:
@@ -350,22 +352,3 @@ class DOH_Interface(Group_Interface):
 
     def cleanup(self, req_id):
         pass
-
-
-if __name__ == "__main__":
-
-    async def run(config):
-        dns_client = DNS_Client(config)
-        await dns_client.start()
-
-        record = DNSRecord.question("google.com")
-        record.header.id = 77
-        response = await dns_client.query(record)
-        print(response)
-
-        await dns_client.stop()
-
-    config = dnsmocklib.config
-
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(run(config))
