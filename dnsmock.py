@@ -7,22 +7,31 @@ import dnsmocklib
 
 logging.basicConfig(level=logging.DEBUG)
 
-config = dnsmocklib.config
+
+async def setup():
+    loop.set_debug(config.getboolean("global", "debug"))
+
+    mocks.start()
+    await client.start()
+    await server.start(mocks, client)
+    await http_server.start(server, mocks)
+
+
+async def shutdown():
+    await http_server.stop()
+    await server.stop()
+    await client.stop()
+    mocks.stop()
+
 
 loop = asyncio.get_event_loop()
-loop.set_debug(config.getboolean("global", "debug"))
-
-mocks = dnsmocklib.mocks(config, loop)
-mocks.start()
-
+config = dnsmocklib.config
+mocks = dnsmocklib.Mocks(config)
 client = dnsmocklib.DNS_Client(config)
-loop.run_until_complete(client.start())
+server = dnsmocklib.DNS_Server(config)
+http_server = dnsmocklib.HttpServer(config)
 
-network = dnsmocklib.network(config, loop)
-network.start(mocks, client)
-
-http_server = dnsmocklib.http_server(config, loop)
-http_server.start(network, mocks)
+loop.run_until_complete(setup())
 
 try:
     print("======== Running ========\n"
@@ -31,8 +40,6 @@ try:
 except KeyboardInterrupt:
     pass
 
-http_server.shutdown()
-network.stop()
-loop.run_until_complete(client.stop())
-mocks.stop()
+loop.run_until_complete(shutdown())
+
 loop.close()

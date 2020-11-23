@@ -198,18 +198,18 @@ class MockHolder:
 
     def add_leases(self, fname, mock):
         leases = IscDhcpLeases(fname)
-        for l in leases.get_current().values():
-            self.set_defaults(fname, mock, l.hostname)
-            ptr_addr = self.to_ptr_v4(l.ip)
+        for lease in leases.get_current().values():
+            self.set_defaults(fname, mock, lease.hostname)
+            ptr_addr = self.to_ptr_v4(lease.ip)
             self.set_defaults(fname, mock, ptr_addr)
-            mock[l.hostname]["A"].add(("A", l.ip))
-            mock[l.hostname]["ANY"].add(("A", l.ip))
-            mock[ptr_addr]["PTR"].add(("PTR", l.hostname))
-            mock[ptr_addr]["ANY"].add(("PTR", l.hostname))
-            fqdn = l.hostname + "." + self.config.get("local", "my_domain")
+            mock[lease.hostname]["A"].add(("A", lease.ip))
+            mock[lease.hostname]["ANY"].add(("A", lease.ip))
+            mock[ptr_addr]["PTR"].add(("PTR", lease.hostname))
+            mock[ptr_addr]["ANY"].add(("PTR", lease.hostname))
+            fqdn = lease.hostname + "." + self.config.get("local", "my_domain")
             self.set_defaults(fname, mock, fqdn)
-            mock[fqdn]["A"].add(("A", l.ip))
-            mock[fqdn]["ANY"].add(("A", l.ip))
+            mock[fqdn]["A"].add(("A", lease.ip))
+            mock[fqdn]["ANY"].add(("A", lease.ip))
             mock[ptr_addr]["PTR"].add(("PTR", fqdn))
             mock[ptr_addr]["ANY"].add(("PTR", fqdn))
 
@@ -298,9 +298,9 @@ class MockHolder:
         self.guard.stop()
 
 
-class Context:
+class Mocks:
 
-    def __init__(self, config, loop):
+    def __init__(self, config):
         self.config = config
 
     def start(self):
