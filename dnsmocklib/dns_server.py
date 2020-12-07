@@ -1,18 +1,26 @@
 #!python3
 # -*- coding: utf-8 -*-
 
+from aiohttp import web
+from aiohttp.web_runner import AppRunner, TCPSite
 import asyncio
+import base64
 from functools import partial
 import ifaddr
 import logging
 from pprint import pformat
 import socket
+import ssl
 import struct
 
 from dnslib import DNSRecord, QR, QTYPE, RCODE
 
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger
+
+
+SHUTDOWN_TIMEOUT = 5
+BACKLOG = 5
 
 
 def qt_qn(record):
@@ -107,6 +115,81 @@ class TCP_Handler:
         if response:
             self.writer.write(struct.pack(">h", len(response)))
             self.writer.write(response)
+
+
+class DOH_Handler:
+
+    def __init__(self, config, handler):
+        self.loop = asyncio.get_running_loop()
+        self.port = config.getint("local", "doh_port")
+        self.path = config.get("local", "doh_path")
+        self.ssl = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+        self.ssl.load_cert_chain(config.get("local", "doh_cert"),
+                                 config.get("local", "doh_key"))
+        self.protocol_handler = handler
+        app = web.Application()
+        app.router.add_get(self.path, self.handle_get)
+        app.router.add_post(self.path, self.handle_post)
+        self.runner = AppRunner(app)
+        asyncio.create_task(self.setup())
+
+    async def setup(self):
+        await self.runner.setup()
+        self.site = TCPSite(self.runner, None, self.port,
+                            ssl_context=self.ssl,
+                            shutdown_timeout=SHUTDOWN_TIMEOUT,
+                            backlog=BACKLOG,
+                            reuse_address=True,
+                            reuse_port=True)
+        await self.site.start()
+        log(__name__).info("DOH_Handler started")
+
+    def __repr__(self):
+        return "%s listening on https://0.0.0.0:%d%s" % (__class__.__name__, self.port, self.path)
+
+    async def handle_get(self, request):
+        if request.content_type != "application/dns-message":
+            return web.Response(status=400, reason="Wrong content type")
+        try:
+            req = base64.urlsafe_b64decode(request.query["dns"])
+            future = asyncio.Future()
+            await self.protocol_handler.handle(req,
+                                               request._transport_peername,
+                                               future.set_result)
+            res = await future
+            resp = web.Response(status=200, reason="OK",
+                                content_type="application/dns-message",
+                                body=res)
+            return resp
+        except Exception as e:
+            log(__name__).info("Error: %s", e, exc_info=True)
+            return web.Response(status=400, reason="Malformed request")
+
+    async def handle_post(self, request):
+        if request.content_type != "application/dns-message":
+            return web.Response(status=400, reason="Wrong content type")
+        try:
+            req = await request.read()
+            future = asyncio.Future()
+            await self.protocol_handler.handle(req,
+                                               request._transport_peername,
+                                               future.set_result)
+            res = await future
+            resp = web.Response(status=200, reason="OK",
+                                content_type="application/dns-message",
+                                body=res)
+            return resp
+        except Exception as e:
+            log(__name__).info("Error: %s", e, exc_info=True)
+            return web.Response(status=400, reason="Malformed request")
+
+    def close(self):
+        pass
+
+    async def wait_closed(self):
+        await self.site.stop()
+        await self.runner.cleanup()
+        log(__name__).info("DOH Server closed")
 
 
 class DNS_Handler:
@@ -210,6 +293,9 @@ class DNS_Server:
             server_list.append(handler)
         for srv in tcp_endpoints:
             server_list.append(srv)
+        if self.config.has_option("local", "doh_port"):
+            if self.config.getint("local", "doh_port") > 0:
+                server_list.append(DOH_Handler(self.config, DNS_Handler(self)))
         return server_list
 
     async def rebind(self):

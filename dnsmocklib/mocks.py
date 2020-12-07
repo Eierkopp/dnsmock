@@ -13,6 +13,7 @@ from dnslib import DNSRecord, QTYPE, RR, RDMAP, RCODE
 from dnsmocklib.file_guard import Guard
 
 logging.basicConfig(level=logging.DEBUG)
+log = logging.getLogger
 
 MOCKED_RECORD_TYPES = ["A", "PTR", "AAAA", "MX", "SOA", "CNAME", "SRV", "NAPTR", "TXT", "ANY"]
 
@@ -27,20 +28,20 @@ class Cache:
         self.config = config
         self.ttl_cache = cachetools.TTLCache(config.getint("cache", "size"),
                                              config.getint("cache", "ttl"))
-        logging.getLogger(__name__).info("Cache initialized")
+        log(__name__).info("Cache initialized")
 
     def add(self, query, response):
         qtype, qname = qt_qn(query)
-        logging.getLogger(__name__).info("Caching response for %s: %s" % (qtype, qname))
+        log(__name__).info("Caching response for %s: %s" % (qtype, qname))
         self.ttl_cache[(qtype, qname)] = response
 
     def forget(self, hostname=None):
         if hostname is not None:
-            logging.getLogger(__name__).info("Host %s removed from cache", hostname)
+            log(__name__).info("Host %s removed from cache", hostname)
             for qt in MOCKED_RECORD_TYPES:
                 self.ttl_cache.pop((qt, hostname), None)
         else:
-            logging.getLogger(__name__).info("Cache flushed")
+            log(__name__).info("Cache flushed")
             self.ttl_cache.clear()
 
     def get(self, entry):
@@ -60,21 +61,21 @@ class MockHolder:
 
     def resolve(self, record, addr):
         if self.standby is not None:
-            logging.getLogger(__name__).info("Activating new mock table")
+            log(__name__).info("Activating new mock table")
             self.active, self.standby = self.standby, None
             self.cache.forget()
 
         qtype, qname = qt_qn(record)
-        logging.getLogger(__name__).info("Resolving %s: %s for %s" % (qtype, qname, addr))
+        log(__name__).info("Resolving %s: %s for %s" % (qtype, qname, addr))
 
         response = self.cache.get((qtype, qname))
         if response:  # already in cache
-            logging.getLogger(__name__).info("Returning cached response for %s: %s", qtype, qname)
+            log(__name__).info("Returning cached response for %s: %s", qtype, qname)
             response.header.id = record.header.id
             return response.pack()
 
         if qtype not in MOCKED_RECORD_TYPES:  # not a mocked qtype
-            logging.getLogger(__name__).info("Not a mocked query type: %s" % qtype)
+            log(__name__).info("Not a mocked query type: %s" % qtype)
             return None
 
         response = record.reply()
@@ -85,14 +86,14 @@ class MockHolder:
             return None
         else:
             fnames, results = result
-            logging.getLogger(__name__).info("Matching %s -> mocked response %s",
-                                             fnames, list(results))
+            log(__name__).info("Matching %s -> mocked response %s",
+                               fnames, list(results))
             for qt, qt_result in results:
                 self.add_record(qt, response, qname, qt_result)
             if len(response.rr) == 0:
                 response.header.rcode = RCODE.NXDOMAIN
-                logging.getLogger(__name__).info("Returning empty response for %s: %s",
-                                                 qtype, qname)
+                log(__name__).info("Returning empty response for %s: %s",
+                                   qtype, qname)
             return response.pack()
 
     def mock_record(self, qtype, qname):
@@ -128,8 +129,8 @@ class MockHolder:
                 if (rtype, rname) not in already_mocked:
                     already_mocked.add((rtype, rname))
                     fnames, mocks = r
-                    logging.getLogger(__name__).info("Filtering %s: %s. %s -> mocked response %s",
-                                                     rtype, rname, fnames, list(mocks))
+                    log(__name__).info("Filtering %s: %s. %s -> mocked response %s",
+                                       rtype, rname, fnames, list(mocks))
                     for qt, qt_result in mocks:
                         self.add_record(qt, record, rname, qt_result)
 
