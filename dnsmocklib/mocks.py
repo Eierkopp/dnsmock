@@ -50,6 +50,9 @@ class Cache:
 
 class MockHolder:
 
+    class DropException(Exception):
+        pass
+
     def __init__(self, config):
         self.config = config
         self.active = None
@@ -76,7 +79,7 @@ class MockHolder:
 
         if qtype not in MOCKED_RECORD_TYPES:  # not a mocked qtype
             log(__name__).info("Not a mocked query type: %s" % qtype)
-            return None
+            raise MockHolder.DropException("not mocked")
 
         response = record.reply()
 
@@ -105,6 +108,7 @@ class MockHolder:
             if not m or qtype not in replacements:
                 continue
             mocked = True
+            print("Replacements:", replacements[qtype])
             mocks.update(replacements[qtype])
             filenames.update(replacements["fname"])
         if mocked:

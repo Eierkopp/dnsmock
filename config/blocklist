@@ -1,4 +1,4 @@
-A MX SOA CNAME ANY
+A MX SOA SRV CNAME ANY
 *.doubleclick.net
 *.ebuzzing.de
 *.facebook.com

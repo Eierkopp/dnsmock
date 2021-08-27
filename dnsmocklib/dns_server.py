@@ -211,7 +211,14 @@ class DNS_Handler:
             callback(None)
             return
 
-        response = self.context.mocks.resolve(record, addr)
+        response = None
+        try:
+            response = self.context.mocks.resolve(record, addr)
+        except self.context.mocks.DropException as e:
+            log(__name__).warning("Dropping request: %s", e)
+            callback(None)
+            return
+
         if response is not None:
             callback(response)
             return

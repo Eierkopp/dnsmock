@@ -7,7 +7,7 @@ export PYBUILD_NAME=dnsmock
 	dh $@
 
 dnsmock:
-	dnsmock_env/bin/python3 -m nuitka -j 4 -o dnsmock --show-scons --recurse-all dnsmock.py
+	dnsmock_env/bin/python3 -m nuitka -j 4 -o dnsmock --show-scons --follow-imports dnsmock.py
 
 override_dh_install: dnsmock
 	dh_install dnsmock /usr/bin
