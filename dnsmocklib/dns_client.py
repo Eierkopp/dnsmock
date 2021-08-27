@@ -9,9 +9,12 @@ from dnslib import DNSRecord, QTYPE, RCODE
 import functools
 import ipaddress
 import logging
+import re
 import socket
 import struct
 import time
+
+from dnsmocklib.mocks import MockHolder
 
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger
@@ -80,6 +83,7 @@ class DOH_Client(DNS_Client):
 
     @log_exception
     async def query(self, dns_packet, req_id):
+        log(__name__).info("DOH query against %s", self.server)
         async with self.session.get(self.server,
                                     params={"dns": dns_packet}) as response:
             if response.status > 299:
@@ -265,32 +269,49 @@ class Client_Interface:
 
 class Group_Interface(Client_Interface):
 
-    def __init__(self, config, name, client_factory, addresses):
+    def __init__(self, config, name, client_factory, section, option):
         super().__init__(config)
         self.name = name
         self.client_factory = client_factory
-        self.addresses = addresses
+        self.section = section
+        self.option = option
+        self.masks = list()
+        self.clients = dict()
 
     async def start(self):
         log(__name__).info("Starting %s interface", self.name)
-        self.clients = [self.client_factory(self, address) for address in self.addresses]
-        for client in self.clients:
-            await client.start()
+        opt_exp = re.compile(r"^%s(_\d+)?$" % self.option)
+        for option in self.config.options(self.section):
+            if opt_exp.match(option):
+                fields = self.config.getlist(self.section, option)
+                mask = fields[0]
+                self.masks.append((mask, MockHolder.as_regex(mask)))
+                self.clients[mask] = [self.client_factory(self, address)
+                                      for address in fields[1:]]
+                for client in self.clients[mask]:
+                    await client.start()
 
     async def stop(self):
         log(__name__).info("Closing %s interface", self.name)
-        for client in self.clients:
-            await client.stop()
+        for clients in self.clients.values():
+            for client in clients:
+                await client.stop()
 
     async def query(self, record: DNSRecord):
         if not self.clients:
             return None
 
-        log(__name__).info("%s query", self.name)
-
         dns_req, req_id = self.prepare(record)
+        jobs = list()
+        for mask, mask_expr in self.masks:
+            if mask_expr.match(str(record.q.qname)):
+                log(__name__).info("Mask %s matches %s for %s query",
+                                   mask, record.q.qname, self.name)
+                clients = self.clients[mask]
+                for client in clients:
+                    jobs.append(asyncio.create_task(client.query(dns_req, req_id)))
+                break
 
-        jobs = [asyncio.create_task(client.query(dns_req, req_id)) for client in self.clients]
         retval = None
         start = time.time()
         finished = len(jobs) == 0
@@ -310,27 +331,27 @@ class Group_Interface(Client_Interface):
         for job in jobs:
             job.cancel()
         self.cleanup(req_id)
-
         return retval
 
 
 class UDP_Interface(Group_Interface):
 
     def __init__(self, config):
-        super().__init__(config, "UDP", UDP_Client, config.getlist("peer", "addresses"))
+        super().__init__(config, "UDP", UDP_Client, "peer", "addresses")
 
     def prepare(self, record):
         return self.mock_id(record)
 
     def cleanup(self, req_id):
-        for client in self.clients:
-            client.deregister(req_id)
+        for mask, _ in self.masks:
+            for client in self.clients[mask]:
+                client.deregister(req_id)
 
 
 class TCP_Interface(Group_Interface):
 
     def __init__(self, config):
-        super().__init__(config, "TCP", TCP_Client, config.getlist("peer", "addresses"))
+        super().__init__(config, "TCP", TCP_Client, "peer", "addresses")
 
     def prepare(self, record):
         return self.mock_id(record)
@@ -342,7 +363,7 @@ class TCP_Interface(Group_Interface):
 class DOH_Interface(Group_Interface):
 
     def __init__(self, config):
-        super().__init__(config, "DOH", DOH_Client, config.getlist("peer", "doh_addresses"))
+        super().__init__(config, "DOH", DOH_Client, "peer", "doh_addresses")
 
     def prepare(self, record):
         orig_id = record.header.id
