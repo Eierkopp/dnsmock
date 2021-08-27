@@ -252,7 +252,8 @@ class MockHolder:
                     mocked_result = json.loads(parts[1])
                     self.set_mocks(fname, mock, parts[0], mocked_result, qtypes)
 
-    def as_regex(self, key):
+    @staticmethod
+    def as_regex(key):
         """convert blocklist pattern to Python regex
         + matches a section, e.g. x.+.y matches x.eier.y but not x.eier.y.z
         * matches everything, e.g. *x.y matches a.x.y or ax.y
