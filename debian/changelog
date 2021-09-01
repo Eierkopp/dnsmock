@@ -1,3 +1,15 @@
+dnsmock (1.4) unstable; urgency=low
+
+  * remove print statement
+
+ -- depperter depp <depperter.depp@googlemail.com>  Wed, 1 Sep 2021 13:32:32 +0200
+
+dnsmock (1.3) unstable; urgency=medium
+
+  * per domain parent DNS
+
+ -- depperter depp <depperter.depp@googlemail.com>  Sat, 28 Aug 2021 17:25:12 +0200
+
 dnsmock (1.2) unstable; urgency=medium
 
   * dns_client refactored

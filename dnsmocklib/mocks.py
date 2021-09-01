@@ -108,7 +108,6 @@ class MockHolder:
             if not m or qtype not in replacements:
                 continue
             mocked = True
-            print("Replacements:", replacements[qtype])
             mocks.update(replacements[qtype])
             filenames.update(replacements["fname"])
         if mocked:
