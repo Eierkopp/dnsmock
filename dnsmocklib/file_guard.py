@@ -26,6 +26,7 @@ class Guard(threading.Thread):
         self.callback = callback
         self.refresh_at = None
         self.running = False
+        self.setDaemon(True)
 
     def add_file(self, fname):
         if self.running:
