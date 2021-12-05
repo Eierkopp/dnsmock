@@ -1,5 +1,7 @@
 debian/dnsmock.debhelper.log
 debian/dnsmock.substvars
+debian/debhelper-build-stamp
+debian/dnsmock.postrm.debhelper
 debian/files
 
 dnsmock.build
