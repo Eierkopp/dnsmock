@@ -1,3 +1,10 @@
+dnsmock (1.5) unstable; urgency=low
+
+	* kick out nuitka
+	* apparmor support (breaks rpm for now)
+
+ -- depperter depp <depperter.depp@googlemail.com>  Sun, 5 Dec 2021 05:13:22 +0100
+
 dnsmock (1.4) unstable; urgency=low
 
   * remove print statement

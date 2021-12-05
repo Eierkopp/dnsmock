@@ -3,7 +3,7 @@
 
 import asyncio
 import logging
-import dnsmocklib
+import dnsmock
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -25,11 +25,11 @@ async def shutdown():
 
 
 loop = asyncio.get_event_loop()
-config = dnsmocklib.config
-mocks = dnsmocklib.Mocks(config)
-client = dnsmocklib.DNS_Client(config)
-server = dnsmocklib.DNS_Server(config)
-http_server = dnsmocklib.HttpServer(config)
+config = dnsmock.config
+mocks = dnsmock.Mocks(config)
+client = dnsmock.DNS_Client(config)
+server = dnsmock.DNS_Server(config)
+http_server = dnsmock.HttpServer(config)
 
 loop.run_until_complete(setup())
 

@@ -6,11 +6,10 @@ export PYBUILD_NAME=dnsmock
 %:
 	dh $@
 
-dnsmock:
-	dnsmock_env/bin/python3 -m nuitka -j 4 -o dnsmock --show-scons --follow-imports dnsmock.py
-
 override_dh_install: dnsmock
-	dh_install dnsmock /usr/bin
+	dh_install bin/dnsmock /usr/bin
+	dh_install etc /
 	dh_install config/dnsmock.conf.sample /etc/dnsmock
 	dh_install config/logger.conf /etc/dnsmock
 	dh_install config/dnsmock.service /lib/systemd/system
+	dh_install dnsmock /usr/lib/python3/dist-packages/

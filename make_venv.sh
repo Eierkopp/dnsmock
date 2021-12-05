@@ -1,9 +1,15 @@
 #!/bin/bash
 
 ENV=dnsmock_env
+PYTHON=`command -v python3`
 
-[ -d $ENV ] || python3 -m venv $ENV
+cd `dirname $0`
 
-. ${ENV}/bin/activate
+[ -d $ENV ] && rm -rf $ENV
+rm -rf dnsmock/site-packages
 
-pip install -U -r requirements.txt
+virtualenv --system-site-packages -p $PYTHON $ENV
+
+$ENV/bin/pip install -U -r requirements.txt
+
+mv $ENV/lib/python*/site-packages dnsmock

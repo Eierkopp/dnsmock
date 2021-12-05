@@ -8,7 +8,7 @@ X-Python3-Version: >= 3.6
 
 Package: dnsmock
 Architecture: any
-Depends: python3
+Depends: python3,python3-multidict,python3-aiohttp,python3-dnslib,python3-cachetools,python3-ifaddr
 Description: Filtering DNS proxy 
   DNS proxy serving local information, masking blocked hosts
   and proxying the rest.

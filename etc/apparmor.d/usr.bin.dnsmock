@@ -1,0 +1,34 @@
+abi <abi/3.0>,
+
+include <tunables/global>
+include <local/usr.bin.dnsmock>
+
+/usr/bin/dnsmock {
+  include <abstractions/base>
+  include <abstractions/nis>
+  include <abstractions/python>
+
+  network inet dgram,
+  network inet stream,
+  network inet6 dgram,
+  network inet6 stream,
+  network raw,
+
+  /etc/dhcp/* r,
+  /etc/dnsmock/* r,
+  /etc/hosts r,
+  /etc/ld.so.cache r,
+  /etc/ssl/* r,
+  /proc/@{pid}/** r,
+  /usr/bin/ r,
+  /usr/bin/dnsmock r,
+  /usr/sbin/ldconfig ix,
+  /usr/share/ca-certificates/** r,
+  /usr/{,local/}lib/python3*/dist-packages/** r,
+  /usr/{,local/}lib/python3*/dist-packages/dnsmock/{,**/}__pycache__/ rw,
+  /usr/{,local}/bin/python* ix,
+  /var/lib/dhcp/* r,
+  /var/log/dnsmock/* w,
+  /var/tmp rw,
+
+}
