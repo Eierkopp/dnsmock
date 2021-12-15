@@ -1,3 +1,4 @@
+# Last Modified: Thu Dec  9 18:38:04 2021
 abi <abi/3.0>,
 
 include <tunables/global>
@@ -18,6 +19,7 @@ include <local/usr.bin.dnsmock>
   /etc/dnsmock/* r,
   /etc/hosts r,
   /etc/ld.so.cache r,
+  /etc/resolv.conf r,
   /etc/ssl/* r,
   /proc/@{pid}/** r,
   /usr/bin/ r,
@@ -30,5 +32,6 @@ include <local/usr.bin.dnsmock>
   /var/lib/dhcp/* r,
   /var/log/dnsmock/* w,
   /var/tmp rw,
+  owner /var/log/dnsmock/* rw,
 
 }
