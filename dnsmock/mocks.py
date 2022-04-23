@@ -10,7 +10,7 @@ from collections import OrderedDict
 from isc_dhcp_leases import IscDhcpLeases
 from dnslib import DNSRecord, QTYPE, RR, RDMAP, RCODE
 
-from dnsmocklib.file_guard import Guard
+from dnsmock.file_guard import Guard
 
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger

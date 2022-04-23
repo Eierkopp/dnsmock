@@ -1,15 +1,11 @@
 #!/bin/bash
 
 ENV_DIR=dnsmock_env
-PYTHON=`which python3`
 
-[ -d $ENV_DIR ] && rm -rf $ENV_DIR
+./make_venv.sh
 
-virtualenv -p $PYTHON $ENV_DIR
-
-$ENV_DIR/bin/pip install -U -r requirements.txt
-
-[ -f dnsmock ] && rm dnsmock
+find . -name "__pycache__" -type d -exec rm -rf {} \;
 
 dpkg-buildpackage -b --no-sign
 
+dpkg-deb -c ../dnsmock*.deb

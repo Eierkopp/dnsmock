@@ -1,10 +1,14 @@
 debian/dnsmock.debhelper.log
 debian/dnsmock.substvars
+debian/debhelper-build-stamp
+debian/dnsmock.postrm.debhelper
+debian/.debhelper/
+debian/dnsmock/
 debian/files
 
 dnsmock.build
 dnsmock_env
-dnsmock
+dnsmock/site-packages/
 
 __pycache__
 

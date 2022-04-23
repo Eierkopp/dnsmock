@@ -14,7 +14,7 @@ import socket
 import struct
 import time
 
-from dnsmocklib.mocks import MockHolder
+from dnsmock.mocks import MockHolder
 
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger
