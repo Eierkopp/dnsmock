@@ -1,6 +1,6 @@
 #!/bin/bash
 
-dig @127.0.0.1 -p 5353 +tcp www.google.com pi.eier.kopp
+#dig @127.0.0.1 -p 5353 +tcp www.google.com anton.my.domain.name
 #dig @127.0.0.1 -p 5353 www.google.com RRSIG
 #dig @127.0.0.1 -p 5353 www.facebook.com
 
@@ -18,3 +18,4 @@ dig @127.0.0.1 -p 5353 +tcp www.google.com pi.eier.kopp
 
 #dig @127.0.0.1 -p 5353 +tcp test.host TXT
 
+dig @127.0.0.1 -p 5353 current.cvd.clamav.net TXT

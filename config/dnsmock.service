@@ -10,6 +10,8 @@ WorkingDirectory=/var/log/dnsmock
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 ExecStart=/usr/bin/dnsmock
 ExecStop=/usr/bin/pkill -u dnsmock -G dnsmock -f "/usr/bin/dnsmock"
+Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target

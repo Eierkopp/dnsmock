@@ -1,3 +1,9 @@
+dnsmock (1.6) unstable; urgency=low
+
+    * allow whitelisting of records
+
+ -- depperter depp <depperter.depp@googlemail.com>  Mon, 7 Nov 2022 11:23:33 +0100
+
 dnsmock (1.5) unstable; urgency=low
 
 	* kick out nuitka
@@ -38,3 +44,4 @@ dnsmock (1.0) unstable; urgency=medium
 
 
 # check format with  $ dpkg-parsechangelog -l debian/changelog --all
+# new entry with $ dch -v X.Y 

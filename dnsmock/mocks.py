@@ -104,9 +104,13 @@ class MockHolder:
         filenames = set()
         mocks = set()
         for expr, replacements in self.active.items():
-            m = expr.fullmatch(qname)
-            if not m or qtype not in replacements:
+            if qtype not in replacements:
                 continue
+            m = expr.fullmatch(qname)
+            if not m:
+                continue
+            if (qtype, None) in replacements[qtype]:
+                return None  # configured as not mocked
             mocked = True
             mocks.update(replacements[qtype])
             filenames.update(replacements["fname"])
@@ -124,7 +128,7 @@ class MockHolder:
         already_mocked = set()
         for rr in rrs:
             rtype = QTYPE[rr.rtype]
-            rname = str(rr.rname)
+            rname = str(rr.rname).rstrip(".")
             r = self.mock_record(rtype, rname)
             if r is None:  # not mocked
                 record.add_answer(rr)
@@ -282,8 +286,11 @@ class MockHolder:
         for i in records:
             entry.setdefault(i, set())
             for record_type, values in mocks.items():
-                for v in values:
-                    entry[i].add((record_type, tuple(v)))
+                if values is None:
+                    entry[i].add((record_type, None))
+                else:
+                    for v in values:
+                        entry[i].add((record_type, tuple(v)))
 
     def to_ptr_v4(self, address):
         bytes = socket.inet_pton(socket.AF_INET, address)
