@@ -1,4 +1,4 @@
 aiosocketpool
 isc-dhcp-leases
 python-hosts
-inotify
+pyre2

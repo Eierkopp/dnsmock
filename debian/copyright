@@ -6,6 +6,9 @@ Files: *
 Copyright: Copyright (c) 2017- Eierkopp
 License: GPL-2+
 
+Files: /usr/lib/python3/dist-packages/dnsmock/site-packages/*
+Copyright: Check METADATA file for details 
+
 License: GPL-2+
  This program is free software; you can redistribute it and/or modify it under
  the terms of the GNU General Public License as published by the Free Software

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import json
-import re
 import socket
 from python_hosts.hosts import Hosts
 import cachetools
@@ -14,6 +13,14 @@ from dnsmock.file_guard import Guard
 
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger
+
+try:
+    import re2 as re
+    log(__name__).info("Using re2 regexp library")
+except ModuleNotFoundError:
+    log(__name__).warning("Falling back to re module, consider installing pyre2")
+    import re
+
 
 MOCKED_RECORD_TYPES = ["A", "PTR", "AAAA", "MX", "SOA", "CNAME", "SRV", "NAPTR", "TXT", "ANY"]
 
