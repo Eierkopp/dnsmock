@@ -62,11 +62,14 @@ class MockHolder:
         self.build_mocks()
         self.guard.start()
 
-    def resolve(self, record, addr):
+    def handle_updates(self):
         if self.standby is not None:
             log(__name__).info("Activating new mock table")
             self.active, self.standby = self.standby, None
             self.cache.forget()
+
+    def resolve(self, record, addr):
+        self.handle_updates()
 
         qtype, qname = qt_qn(record)
         log(__name__).info("Resolving %s: %s for %s" % (qtype, qname, addr))

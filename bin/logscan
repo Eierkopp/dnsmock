@@ -1,0 +1,49 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+
+import logging
+import re
+import dnslib
+import dnsmock
+
+
+logging.basicConfig(level=logging.DEBUG)
+log = logging.getLogger
+
+
+def scan_file(fname):
+    expr = re.compile(config.get("logscan", "line_expr"))
+    forwarded = set()
+    blocked = set()
+    with open(fname, "r", encoding="ascii") as f:
+        for line in f:
+            line = line.strip()
+            m = expr.match(line)
+            if m:
+                qtype = dnslib.QTYPE.get(m.group("type"))
+                resource = m.group("resource")
+                result = mocks.mocks.mock_record(qtype, resource)
+                if result is None:
+                    forwarded.add((resource, qtype))
+                elif not result[1]:
+                    blocked.add((resource, qtype))
+    forward_list = list(forwarded)
+    forward_list.sort()
+    print("Forwarded:")
+    for record in forward_list:
+        print("%-70s %s" % record)
+    blocked_list = list(blocked)
+    blocked_list.sort()
+    print("Blocked:")
+    for record in blocked_list:
+        print("%-70s %s" % record)
+
+
+config = dnsmock.config
+mocks = dnsmock.Mocks(config)
+mocks.start()
+mocks.mocks.handle_updates()
+
+scan_file(config.get("logscan", "filename"))
+
+mocks.stop()
