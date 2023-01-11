@@ -6,6 +6,7 @@ import logging
 import dnsmock
 
 logging.basicConfig(level=logging.DEBUG)
+log = logging.getLogger
 
 
 async def setup():
@@ -24,21 +25,22 @@ async def shutdown():
     mocks.stop()
 
 
-loop = asyncio.get_event_loop()
+loop = asyncio.new_event_loop()
 config = dnsmock.config
 mocks = dnsmock.Mocks(config)
 client = dnsmock.DNS_Client(config)
 server = dnsmock.DNS_Server(config)
 http_server = dnsmock.HttpServer(config)
 
-loop.run_until_complete(setup())
-
 try:
+    loop.run_until_complete(setup())
     print("======== Running ========\n"
           "(Press CTRL+C to quit)")
     loop.run_forever()
 except KeyboardInterrupt:
     pass
+except Exception:
+    log(__name__).error("Error running dnsmock", exc_info=True)
 
 loop.run_until_complete(shutdown())
 
