@@ -1,3 +1,9 @@
+dnsmock (1.7) unstable; urgency=low
+
+    * log analyzer
+
+ -- depperter depp <depperter.depp@googlemail.com>  Fri, 6 Dec 2023 13:13:23 +0100
+
 dnsmock (1.6) unstable; urgency=low
 
     * allow whitelisting of records

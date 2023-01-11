@@ -8,6 +8,7 @@ export PYBUILD_NAME=dnsmock
 
 override_dh_install: dnsmock
 	dh_install bin/dnsmock /usr/bin
+	dh_install bin/logscan /usr/bin
 	dh_install etc /
 	dh_install config/dnsmock.conf.sample /etc/dnsmock
 	dh_install config/logger.conf /etc/dnsmock
