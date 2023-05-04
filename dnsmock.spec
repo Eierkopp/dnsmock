@@ -9,7 +9,7 @@ URL: https://github.com/Eierkopp/dnsmock.git
 Group: Applications/Internet
 Packager: Eierkopp
 Requires: bash, python3
-BuildRequires: python3-devel, gcc-c++
+BuildRequires: python3
 Source: dnsmock.tar.bz2
 AutoReqProv: no
 
@@ -35,8 +35,7 @@ mkdir -p $RPM_BUILD_ROOT/etc/dnsmock
 cp -a config/dnsmock.conf.sample $RPM_BUILD_ROOT/etc/dnsmock
 cp -a config/dnsmock.conf.sample config/logger.conf $RPM_BUILD_ROOT/etc/dnsmock
 mkdir -p $RPM_BUILD_ROOT/usr/bin
-[ -f dnsmock ] || dnsmock_env/bin/python3 -m nuitka -j 4 -o dnsmock --show-scons --recurse-all dnsmock.py
-cp -a dnsmock $RPM_BUILD_ROOT/usr/bin
+cp -a bin/dnsmock $RPM_BUILD_ROOT/usr/bin
 mkdir -p $RPM_BUILD_ROOT/usr/share/doc/dnsmock
 cp -a LICENSE $RPM_BUILD_ROOT/usr/share/doc/dnsmock
 mkdir -p $RPM_BUILD_ROOT/lib/systemd/system

@@ -19,7 +19,7 @@ try:
     log(__name__).info("Using re2 regexp library")
 except ModuleNotFoundError:
     log(__name__).warning("Falling back to re module, consider installing pyre2")
-    import re
+    import re  # type: ignore[no-redef]
 
 
 MOCKED_RECORD_TYPES = ["A", "PTR", "AAAA", "MX", "SOA", "CNAME", "SRV", "NAPTR", "TXT", "ANY"]
@@ -154,7 +154,7 @@ class MockHolder:
     @staticmethod
     def add_record(qt_name, response, qname, value):
         qt = QTYPE.reverse[qt_name]
-        if isinstance(value, tuple):
+        if isinstance(value, tuple) or isinstance(value, list):
             response.add_answer(RR(qname, qt, rdata=RDMAP[qt_name](*value)))
         else:
             response.add_answer(RR(qname, qt, rdata=RDMAP[qt_name](value)))

@@ -9,7 +9,6 @@ import json
 import os
 import shlex
 import sys
-import types
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -25,15 +24,17 @@ def argname(section, option):
     return (section + "-" + option).lower()
 
 
-def destname(section, option):
+def destname(section: str, option: str) -> str:
     if section == "global":
         return option.lower()
     return (section + "_" + option).lower()
 
 
-def get_list(conf, section, option, **kwargs):
-    value = conf.get(section, option, **kwargs)
-    return [x.strip() for x in shlex.split(value)]
+class MyConfigParser(ConfigParser):
+
+    def getlist(self, section, option, **kwargs):
+        value = self.get(section, option, **kwargs)
+        return [x.strip() for x in shlex.split(value)]
 
 
 parser = argparse.ArgumentParser(prog='dnsmock',
@@ -58,8 +59,7 @@ if not os.access(conf_file, os.R_OK):
     logging.getLogger(__name__).error("Please provide a config file")
     sys.exit(1)
 
-config = ConfigParser(interpolation=ExtendedInterpolation())
-config.getlist = types.MethodType(get_list, config)
+config = MyConfigParser(interpolation=ExtendedInterpolation())
 config.read(conf_file)
 
 parser = argparse.ArgumentParser(prog='dnsmock',

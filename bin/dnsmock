@@ -15,7 +15,7 @@ async def setup():
     mocks.start()
     await client.start()
     await server.start(mocks, client)
-    await http_server.start(server, mocks)
+    await http_server.start(mocks)
 
 
 async def shutdown():

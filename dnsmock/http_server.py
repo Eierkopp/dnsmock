@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 
+from configparser import ConfigParser
+
 from functools import partial
 import logging
 from aiohttp import web, ClientSession
 from aiohttp.web_runner import AppRunner, TCPSite
+from dnslib import DNSRecord, DNSQuestion, QTYPE
+
+from .mocks import Mocks, MockHolder, Cache
 
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger
@@ -35,7 +40,7 @@ async def handle_update(context, request):
         return web.Response(status=500)
 
 
-async def handle_flush(cache, request):
+async def handle_flush(cache: Cache, request: web.Request) -> web.Response:
     try:
         cache.forget()
         return web.Response(status=200)
@@ -45,12 +50,29 @@ async def handle_flush(cache, request):
         return web.Response(status=500)
 
 
+async def handle_set(mocks: MockHolder, request: web.Request) -> web.Response:
+    try:
+        mocks.handle_updates()
+        record = request.match_info.get("record")
+        qname = request.match_info.get("qname")
+        value = await request.json()
+        qt = QTYPE.reverse[record]
+        query = DNSRecord(q=DNSQuestion(qname, qt))
+        response = query.reply()
+        mocks.add_record(record, response, qname, value)
+        mocks.cache.add(query, response)
+        return web.Response(status=200)
+    except Exception as e:
+        log(__name__).error("Call to /set failed: %s", e, exc_info=True)
+        return web.Response(status=500)
+
+
 class HttpServer:
 
-    def __init__(self, config):
+    def __init__(self, config: ConfigParser) -> None:
         self.config = config
 
-    async def run_app(self, app, host, port):
+    async def run_app(self, app: web.Application, host: str, port: int) -> None:
         self.runner = AppRunner(app)
 
         await self.runner.setup()
@@ -67,16 +89,16 @@ class HttpServer:
         for site in sites:
             await site.start()
 
-    async def stop(self):
+    async def stop(self) -> None:
         await self.runner.cleanup()
 
-    async def start(self, network, mocks):
-        self.network = network
-        self.cache = mocks.cache
+    async def start(self, mocks: Mocks) -> None:
+        cache = mocks.cache
         app = web.Application()
 
         app.router.add_get('/update', partial(handle_update, self))
-        app.router.add_get('/flush', partial(handle_flush, self.cache))
+        app.router.add_get('/flush', partial(handle_flush, cache))
+        app.router.add_post('/set/{record}/{qname}', partial(handle_set, mocks.mocks))
 
         await self.run_app(app,
                            self.config.get("dyndns", "host"),

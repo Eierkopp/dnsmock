@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from abc import ABC, abstractmethod
 import aiohttp
 from aiosocketpool import AsyncConnectionPool, AsyncTcpConnector
 import asyncio
@@ -13,6 +14,7 @@ import re
 import socket
 import struct
 import time
+from typing import Any, Callable
 
 from dnsmock.mocks import MockHolder
 
@@ -20,7 +22,26 @@ logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger
 
 
-def log_exception(function):
+class DNS_Client_Base(ABC):
+
+    def __init__(self, interface, server):
+        self.interface = interface
+        self.server = server
+
+    @abstractmethod
+    async def start(self):
+        pass
+
+    @abstractmethod
+    async def stop(self):
+        pass
+
+    @abstractmethod
+    async def query(self, record: DNSRecord):
+        pass
+
+
+def log_exception(function: Callable[[Any, Any, Any], Any]):
 
     module = function.__module__
     myname = module + "." + function.__name__
@@ -50,23 +71,7 @@ def log_exception(function):
         return wrapper
 
 
-class DNS_Client:
-
-    def __init__(self, interface, server):
-        self.interface = interface
-        self.server = server
-
-    async def start(self):
-        raise NotImplementedError()
-
-    async def stop(self):
-        raise NotImplementedError()
-
-    async def query(self, record):
-        raise NotImplementedError()
-
-
-class DOH_Client(DNS_Client):
+class DOH_Client(DNS_Client_Base):
 
     def __init__(self, interface, server):
         super().__init__(interface, server)
@@ -95,7 +100,7 @@ class DOH_Client(DNS_Client):
             return resp
 
 
-class UDP_Client(DNS_Client, asyncio.DatagramProtocol):
+class UDP_Client(DNS_Client_Base, asyncio.DatagramProtocol):
 
     def __init__(self, interface, server):
         super().__init__(interface, server)
@@ -136,7 +141,7 @@ class UDP_Client(DNS_Client, asyncio.DatagramProtocol):
         return future.result()
 
 
-class TCP_Client(DNS_Client):
+class TCP_Client(DNS_Client_Base):
 
     def __init__(self, interface, server):
         super().__init__(interface, server)
@@ -212,7 +217,7 @@ class DNS_Client(object):
         return response is not None and response.header.rcode in [RCODE.NOERROR, RCODE.NXDOMAIN]
 
 
-class Client_Interface:
+class Client_Interface(ABC):
 
     def __init__(self, config):
         self.config = config
@@ -257,14 +262,25 @@ class Client_Interface:
                         break
         return result
 
+    @abstractmethod
     async def start(self):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     async def stop(self):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     async def query(self, record):
-        raise NotImplementedError()
+        pass
+
+    @abstractmethod
+    def prepare(self, record):
+        pass
+
+    @abstractmethod
+    def cleanup(self, req_id: int) -> None:
+        pass
 
 
 class Group_Interface(Client_Interface):
@@ -302,14 +318,14 @@ class Group_Interface(Client_Interface):
             return None
 
         dns_req, req_id = self.prepare(record)
-        jobs = list()
+        jobs = set()
         for mask, mask_expr in self.masks:
             if mask_expr.match(str(record.q.qname)):
                 log(__name__).info("Mask %s matches %s for %s query",
                                    mask, record.q.qname, self.name)
                 clients = self.clients[mask]
                 for client in clients:
-                    jobs.append(asyncio.create_task(client.query(dns_req, req_id)))
+                    jobs.add(asyncio.create_task(client.query(dns_req, req_id)))
                 break
 
         retval = None
