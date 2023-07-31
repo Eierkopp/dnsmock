@@ -1,5 +1,9 @@
 #!/bin/bash
 
-export PYTHONPATH="$(dirname "$0")"
+export PYTHONPATH
+PYTHONPATH="$(dirname "$0")":"$(dirname "$0")"/dnsmock
 
-python3 bin/dnsmock --config config/devel.conf "$@"
+export DNSMOCK_CONFIG
+DNSMOCK_CONFIG=config/config.yaml
+
+python3 bin/dnsmock "$@"

@@ -13,7 +13,7 @@
 #dig @127.0.0.1 -p 5353 +tcp test.domain A
 # dig @127.0.0.1 -p 5353 +tcp test.domain2 CNAME
 #dig @127.0.0.1 -p 5353 +tcp test.domain3 AAAA
-dig @127.0.0.1 -p 5353 +tcp test.domain4 A
+#dig @127.0.0.1 -p 5353 +tcp test.domain4 A
 
 #dig @127.0.0.1 -p 5353 +tcp  A
 
@@ -21,7 +21,33 @@ dig @127.0.0.1 -p 5353 +tcp test.domain4 A
 
 #dig @127.0.0.1 -p 5353 current.cvd.clamav.net TXT
 
+# dig @127.0.0.1 -p 5353 ip6-allnodes AAAA
+#dig @127.0.0.1 +tcp -p 5353 ip6-allnodes AAAA
+
 # overwrite cache entry:
 
 # temporarily set some SRV record
-curl -vd '[20, 10, 5060, "some.domain"]' -H "Content-Type: application/json" -X POST http://localhost:6668/set/SRV/test.domain4
+#curl -vd '[20, 10, 5060, "some.domain"]' -H "Content-Type: application/json" http://localhost:6668/set/SRV/test.domain4
+#dig @127.0.0.1 -p 5353 +tcp test.domain4 SRV
+
+
+
+
+
+# curl -i http://localhost:6668/flush
+
+# curl -i http://localhost:6668/update
+
+
+# Tests for blocklist_local_MX
+
+#dig @127.0.0.1 -p 5353 test MX
+#dig @127.0.0.1 -p 5353 xxx.anton MX
+#dig @127.0.0.1 -p 5353 xxx.my.domain.name MX
+
+# Tests for blocklist_local_TXT
+
+dig @127.0.0.1 -p 5353 test TXT
+dig @127.0.0.1 -p 5353 current.cvd.clamav.net TXT
+
+
