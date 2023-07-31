@@ -2,23 +2,21 @@
 # -*- coding: utf-8 -*-
 
 import asyncio
-import logging
 import dnsmock
 
-logging.basicConfig(level=logging.DEBUG)
-log = logging.getLogger
+from dnsmock import config, log
 
 
-async def setup():
-    loop.set_debug(config.getboolean("global", "debug"))
+async def setup() -> None:
+    loop.set_debug(config.debug)
 
     mocks.start()
     await client.start()
-    await server.start(mocks, client)
-    await http_server.start(mocks)
+    await server.start()
+    await http_server.start()
 
 
-async def shutdown():
+async def shutdown() -> None:
     await http_server.stop()
     await server.stop()
     await client.stop()
@@ -26,16 +24,18 @@ async def shutdown():
 
 
 loop = asyncio.new_event_loop()
-config = dnsmock.config
 mocks = dnsmock.Mocks(config)
 client = dnsmock.DNS_Client(config)
-server = dnsmock.DNS_Server(config)
-http_server = dnsmock.HttpServer(config)
+server = dnsmock.DNS_Server(config, mocks, client)
+http_server = dnsmock.HttpServer(config, mocks, server)
 
 try:
     loop.run_until_complete(setup())
-    print("======== Running ========\n"
-          "(Press CTRL+C to quit)")
+    print(
+        """======== Running ========
+(Press CTRL+C to quit)"""
+    )
+
     loop.run_forever()
 except KeyboardInterrupt:
     pass
