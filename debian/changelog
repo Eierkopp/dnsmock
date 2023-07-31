@@ -1,3 +1,9 @@
+dnsmock (2.0) unstable; urgency=low
+
+  * refactored
+
+ --  <depperter.depp@googlemail.com>  Fri, 28 Jul 2023 11:16:43 +0200
+
 dnsmock (1.8) UNRELEASED; urgency=medium
 
   * use re2 regexp library if available

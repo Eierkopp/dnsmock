@@ -10,7 +10,6 @@ override_dh_install: dnsmock
 	dh_install bin/dnsmock /usr/bin
 	dh_install bin/logscan /usr/bin
 	dh_install etc /
-	dh_install config/dnsmock.conf.sample /etc/dnsmock
-	dh_install config/logger.conf /etc/dnsmock
+	dh_install config/config.yaml /etc/dnsmock
 	dh_install config/dnsmock.service /lib/systemd/system
 	dh_install dnsmock /usr/lib/python3/dist-packages/

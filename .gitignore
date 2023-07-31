@@ -8,8 +8,7 @@ debian/files
 
 dnsmock.build
 dnsmock_env
-dnsmock/site-packages/
+dnsmock/env/
 
 __pycache__
 
-*~
