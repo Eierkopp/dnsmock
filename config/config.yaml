@@ -1,0 +1,228 @@
+logging:
+  version: 1
+  disable_existing_loggers: false
+
+  handlers:
+    console:
+      class : logging.StreamHandler
+      formatter: precise
+      filters: [hidepwd]
+      level   : DEBUG
+      stream  : ext://sys.stdout
+    file_handler:
+      backupCount: 10
+      level: INFO
+      filename: "/var/log/dnsmock/dnsmock.log"
+      formatter: standard
+      class: logging.handlers.RotatingFileHandler
+      maxBytes: 10485760
+    syslog_handler:
+      level: INFO
+      formatter: standard
+      class: logging.handlers.SysLogHandler
+      address: ["127.0.0.1", 514 ]
+
+  root:
+    level: DEBUG
+    handlers: [console]
+     
+  formatters:
+    brief:
+      datefmt: "%s"
+      format: "%(asctime)s:%(message)s"
+    standard:
+      datefmt: "%Y%m%d_%H%M%S"
+      format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    precise:
+      datefmt: "%Y%m%d_%H%M%S"
+      format: "%(asctime)s [%(levelname)-8s] %(name)-18s: %(message)s"
+
+  filters:
+    hidepwd:
+      "()": dnsmock.logger.HidePart
+      mask: "(?i)(?:.*password': ')(.*)"
+      replacement: "***"   
+
+debug:
+  default: false
+  action: store_true
+  help: If enabled, use asyncio debugging
+
+
+cache:
+
+  size:
+    default: 1024
+    type: int
+    help: Number of DNS responses in cache
+
+  ttl:
+    default: 300
+    type: int
+    help: Expiry time of cache entries
+
+local:
+
+  refresh_after:
+    default: 1
+    help: Refresh mocking table when files are unaltered for at least this many seconds.
+    type: int
+
+dyndns:
+  update_urls:
+    default:
+      - https://DYNDNS_PROVIDER/some_refresh_url
+      - https://OTHER_DYNDNS_PROVIDER/some_refresh_url
+    help: List of HTTP(S) calls to be made to update dyndns providers
+    nargs: "*"
+    
+  hostnames:
+    default:
+      - my.domain.name
+      - my.other.domain.name
+    nargs: "*"
+    type: str
+    help: List of hostnames to be flushed from cache after dyndns update
+
+  host:
+    default: "0.0.0.0"
+    type: str
+    help: Listening address for local webserver
+
+  port:
+    default: 6668
+    type: int
+    help: Listening port for local webserver
+
+peer:
+  timeout:
+    default: 2.0
+    type: float
+    help: Timeout when querying peer DNS server in seconds
+
+  addresses:
+    help: List of peer DNS addresses in format DOMAIN_PATTERN DNS_IPs
+    type: str
+    nargs: "*"
+    default:
+      - "*.my.domain.name 192.168.178.20"
+      - "+.178.168.192.in-addr.arpa 192.168.178.20"
+      - "* 9.9.9.9"
+
+  doh_addresses:
+    help: List of DOH URLs in format DOMAIN_PATTERN  and a list of servers
+    type: str
+    nargs: "*"
+    default:
+      - "* https://9.9.9.11/dns-query https://146.112.41.2/dns-query"
+
+ip_filter:
+
+  ranges:
+    help: List of IP address ranges to be removed from proxied responses
+    nargs: "*"
+    type: str
+    default:
+      - "127.0.0.0/8"
+      - "192.168.0.0/16"
+      - "::1"
+      - "fe80::/10"
+
+local:
+  interfaces:
+    default:
+      - lo
+      - eno1
+    help: List of local interfaces to bind to
+    nargs: "+"
+    type: str
+
+  port:
+    default: 5353
+    type: int
+    help: Local port to listen on
+
+  request_timeout:
+    default: 2.0
+    type: float
+    help: Max time to wait for any DNS response
+
+  refresh_after:
+    default: 1.0
+    type: float
+    help: Refresh mocking table when files are unaltered for at least this many seconds.
+
+  conn_timeout:
+    default: 3.0
+    type: float
+    help: Max connection idle time
+
+  doh_port:
+    default: 5354
+    type: int
+    help: Port number of DOH server, -1 to disable
+
+  doh_path:
+    default: "/dns-query"
+    help: URL path of DOH server
+    
+  doh_cert:
+    default: config/eierkopp.crt
+    help: Path to server TLS certificate
+
+  doh_key:
+    default: config/eierkopp.key
+    help: Path to server TLS key
+
+  min_ttl:
+    default: 120
+    type: int
+    help: Min TTL for proxied answers in seconds
+
+  my_domain:
+    default: my.domain.name
+    help: My domain name, used to complete records where only the hostname is configured.
+
+
+
+isc_dhcpd:
+
+  leases_v4:
+    default: []
+      # - config/dhcpd.leases
+    help: List of isc dhcpd lease files. Order is important.
+    nargs: "*"
+
+  files:
+    default: []
+    # - config/dhcpd.conf
+    help: List of isc dhcpd config files. Order is important.
+    nargs: "*"
+
+  
+hosts:
+
+  files:
+    default: []
+    # - "/etc/hosts"
+    nargs: "*"
+    help: List of host files to import. Order is important.
+
+blocklist:
+
+  files:
+    default:
+      - config/blocklist_local_TXT
+    help: List of blocklists to import. Order is important.
+    nargs: "*"
+  
+# files =  config/blocklist_local_TXT config/blocklist_local config/blocklist_local_PTR config/blocklist_local_SRV config/blocklist config/blocklist_AAAA_SOA
+
+
+
+# [logscan]
+
+# filename = /tmp/dnsmock.log
+# line_expr = .* Resolving (?P<type>[^:]*): (?P<resource>[^\s]*) for .*
+
+
