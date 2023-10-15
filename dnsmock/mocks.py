@@ -13,6 +13,7 @@ from typing import cast, Dict, Generator, List, Optional, Set, Tuple
 
 from dnsmock.logger import log
 from dnsmock.file_guard import Guard
+from dnsmock.leakybucket import LeakyBucket
 
 
 try:
@@ -62,10 +63,10 @@ class Cache:
         self.ttl_cache: cachetools.Cache = cachetools.TTLCache(config.cache_size, config.cache_ttl)
         log(__name__).info("Cache initialized")
 
-    def add(self, query: DNSRecord, response: DNSRecord) -> None:
+    def add(self, query: DNSRecord, response: DNSRecord, bucket: LeakyBucket) -> None:
         qtype, qname = qt_qn(query)
         log(__name__).info("Caching response for %s: %s" % (qtype, qname))
-        self.ttl_cache[(qtype, qname)] = response
+        self.ttl_cache[(qtype, qname)] = (response, bucket)
 
     def forget(self, hostname: Optional[str] = None) -> None:
         if hostname is not None:
@@ -76,7 +77,7 @@ class Cache:
             log(__name__).info("Cache flushed")
             self.ttl_cache.clear()
 
-    def get(self, entry: Tuple[str, str]) -> DNSRecord:
+    def get(self, entry: Tuple[str, str]) -> Optional[Tuple[DNSRecord, LeakyBucket]]:
         return self.ttl_cache.get(entry)
 
 
@@ -176,11 +177,16 @@ class MockHolder:
         qtype, qname = qt_qn(record)
         log(__name__).info("Resolving %s: %s for %s" % (qtype, qname, addr))
 
-        response = self.cache.get((qtype, qname))
-        if response:  # already in cache
-            log(__name__).info("Returning cached response for %s: %s", qtype, qname)
-            response.header.id = record.header.id
-            return cast(bytes, response.pack())
+        cache_entry = self.cache.get((qtype, qname))
+        if cache_entry:  # already in cache
+            response, bucket = cache_entry
+            if bucket.try_add():
+                log(__name__).info("Returning cached response for %s: %s", qtype, qname)
+                response.header.id = record.header.id
+                return cast(bytes, response.pack())
+            else:
+                log(__name__).info("DOS protection, dropping request %s: %s", qtype, qname)
+                raise MockHolder.DropException("not mocked")
 
         if qtype not in MOCKED_RECORD_TYPES:  # not a mocked qtype
             log(__name__).info("Not a mocked query type: %s" % qtype)

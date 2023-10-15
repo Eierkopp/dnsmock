@@ -20,6 +20,7 @@ from dnslib import DNSRecord, QR, RCODE
 
 from .dns_client import DNS_Client
 from .mocks import Mocks, qt_qn
+from .leakybucket import LeakyBucket
 
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger
@@ -34,9 +35,17 @@ Address = Tuple[str, int]
 class DNS_Handler(ABC):
     def __init__(self, config: argparse.Namespace, mocks: Mocks, client: DNS_Client) -> None:
         self.config = config
+        self.schedule = self.mk_schedule()
         self.mocks = mocks
         self.cache = mocks.cache
         self.client = client
+
+    def mk_schedule(self) -> List[Tuple[float, int]]:
+        retval = list()
+        for sched in self.config.dos_schedule:
+            interval_str, count_str = sched.split(",")
+            retval.append((float(interval_str), int(count_str)))
+        return retval
 
     @abstractmethod
     async def close(self) -> None:
@@ -60,8 +69,7 @@ class DNS_Handler(ABC):
         response = None
         try:
             response = self.mocks.resolve(record, addr)
-        except self.mocks.DropException as e:
-            log(__name__).warning("Dropping request: %s", e)
+        except self.mocks.DropException:
             return None
         except Exception:
             log(__name__).error("Error in resolve", exc_info=True)
@@ -76,7 +84,8 @@ class DNS_Handler(ABC):
                 if rr.ttl < self.config.local_min_ttl:
                     rr.ttl = self.config.local_min_ttl
             self.mocks.filter_response(result)
-            self.cache.add(record, result)
+            bucket = LeakyBucket(self.schedule)
+            self.cache.add(record, result, bucket)
             return cast(bytes, result.pack())
         else:
             return self.generic_error(record)
@@ -303,8 +312,9 @@ class DNS_Server:
                 )
                 tcp_handler.set_server(server)
                 server_list.append(tcp_handler)
-            except Exception:
+            except Exception as e:
                 log(__name__).warning("Not listening on %s:%s", ip_addr, port)
+                log(__name__).debug("Not listening on %s:%s", ip_addr, port, exc_info=e)
 
         try:
             if self.config.local_doh_port > 0:

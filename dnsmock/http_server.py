@@ -3,11 +3,13 @@
 import argparse
 from aiohttp import web, ClientSession
 from aiohttp.web_runner import AppRunner, TCPSite
+from typing import List, Tuple
 from dnslib import DNSRecord, DNSQuestion, QTYPE
 
 from .dns_server import DNS_Server
 from .mocks import Mocks
 from .logger import log
+from .leakybucket import LeakyBucket
 
 SHUTDOWN_TIMEOUT = 5
 BACKLOG = 5
@@ -16,8 +18,16 @@ BACKLOG = 5
 class HttpServer:
     def __init__(self, config: argparse.Namespace, mocks: Mocks, server: DNS_Server) -> None:
         self.config = config
+        self.schedule = self.mk_schedule()
         self.mocks = mocks
         self.server = server
+
+    def mk_schedule(self) -> List[Tuple[float, int]]:
+        retval = list()
+        for sched in self.config.dos_schedule:
+            interval_str, count_str = sched.split(",")
+            retval.append((float(interval_str), int(count_str)))
+        return retval
 
     async def handle_set(self, request: web.Request) -> web.Response:
         try:
@@ -32,8 +42,9 @@ class HttpServer:
             qt = QTYPE.reverse[record]
             query = DNSRecord(q=DNSQuestion(qname, qt))
             response = query.reply()
-            self.mocks.add_record(record, response, qname, value)
-            self.mocks.cache.add(query, response)
+            self.mocks.add_record(qname, response, record, value)
+            bucket = LeakyBucket(self.schedule)
+            self.mocks.cache.add(query, response, bucket)
             return web.Response(status=200)
         except Exception as e:
             log(__name__).error("Call to /set failed: %s", e, exc_info=True)
