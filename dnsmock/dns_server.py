@@ -35,12 +35,12 @@ Address = Tuple[str, int]
 class DNS_Handler(ABC):
     def __init__(self, config: argparse.Namespace, mocks: Mocks, client: DNS_Client) -> None:
         self.config = config
-        self.schedule = self.mk_schedule()
+        self.dos_schedule = self.mk_dos_schedule()
         self.mocks = mocks
         self.cache = mocks.cache
         self.client = client
 
-    def mk_schedule(self) -> List[Tuple[float, int]]:
+    def mk_dos_schedule(self) -> List[Tuple[float, int]]:
         retval = list()
         for sched in self.config.dos_schedule:
             interval_str, count_str = sched.split(",")
@@ -84,7 +84,7 @@ class DNS_Handler(ABC):
                 if rr.ttl < self.config.local_min_ttl:
                     rr.ttl = self.config.local_min_ttl
             self.mocks.filter_response(result)
-            bucket = LeakyBucket(self.schedule)
+            bucket = LeakyBucket(self.dos_schedule)
             self.cache.add(record, result, bucket)
             return cast(bytes, result.pack())
         else:

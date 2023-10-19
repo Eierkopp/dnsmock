@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import ipaddress
 import json
 from pprint import pformat
 import socket
@@ -158,12 +159,27 @@ class MockHolder:
 
     def __init__(self, config: argparse.Namespace) -> None:
         self.config = config
+        self.dos_ignore = self.mk_dos_ignore()
         self.cache = Cache(config)
         self.active: MOCKS_DICT = dict()
         self.standby: Optional[MOCKS_DICT] = None
         self.guard = Guard(config.local_refresh_after, self.build_mocks)
         self.build_mocks()
         self.guard.start()
+
+    def mk_dos_ignore(self) -> List[ipaddress.IPv4Network | ipaddress.IPv6Network]:
+        retval = list()
+        for net in self.config.ip_filter_ranges:
+            retval.append(ipaddress.ip_network(net))
+        return retval
+
+    def is_dos_ignored(self, addr: Tuple[str, int]) -> bool:
+        ip = ipaddress.ip_address(addr[0])
+        for net in self.dos_ignore:
+            if ip in net:
+                log(__name__).debug("IP %s exempted from DOS protection" % ip)
+                return True
+        return False
 
     def handle_updates(self) -> None:
         if self.standby is not None:
@@ -180,13 +196,13 @@ class MockHolder:
         cache_entry = self.cache.get((qtype, qname))
         if cache_entry:  # already in cache
             response, bucket = cache_entry
-            if bucket.try_add():
+            if self.is_dos_ignored(addr) or bucket.try_add():
                 log(__name__).info("Returning cached response for %s: %s", qtype, qname)
                 response.header.id = record.header.id
                 return cast(bytes, response.pack())
             else:
                 log(__name__).info("DOS protection, dropping request %s: %s", qtype, qname)
-                raise MockHolder.DropException("not mocked")
+                raise MockHolder.DropException("DOS protection triggered")
 
         if qtype not in MOCKED_RECORD_TYPES:  # not a mocked qtype
             log(__name__).info("Not a mocked query type: %s" % qtype)
